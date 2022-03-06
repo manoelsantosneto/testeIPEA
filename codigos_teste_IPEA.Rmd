@@ -1,0 +1,123 @@
+---
+title: "Teste IPEA"
+author: "Manoel Santos-Neto"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pacotes
+
+```{r message=FALSE}
+library(tidyverse)
+library(data.table)
+library(plotly)
+library(tidyquant)
+library(grid)
+```
+
+
+## Importando os Dados
+
+Para importar os dados será utilizada a função `fread()` do pacote `data.table`.
+
+```{r}
+dados_teste <- fread("simulacao_ipea.csv")
+dados_teste %>% head()
+```
+
+
+
+## Extraindo Informações dos Dados
+1. Qual é a quantidade de trabalhadores do sexo masculino com idade igual ou superior a 50 anos, registrados no estado da Bahia, no ano de 2019?
+
+```{r}
+quest1 <- dados_teste %>% filter(sexo == "M" & idade >= 50 & uf == "BA" & ano == 2019) # realizando a filtragem
+quest1 %>% head() #vendo parte dos dados
+quest1 %>% NROW() #quantidade de observacoes
+```
+
+
+
+2. Qual ano e estabelecimento apresenta a maior quantidade de registros do sexo feminino?
+
+```{r}
+quest2 <- dados_teste %>% filter(sexo == "F") 
+quest2 %>% head()
+quest2 %>% count(ano, orgao)  %>% arrange(desc(n))
+```
+
+
+3. Sabendo-se que o nível de escolaridade de um trabalhador vai de 1 até 5, qual é o percentual de trabalhadores, registrados no estabelecimento Ipea, com escolaridade nível 4 no ano de 2015?
+
+```{r}
+quest3 <- dados_teste %>% filter(ano == 2015 & orgao == "Ipea" & escolaridade %in% 1:5)
+quest3 %>% head()
+quest3 %>% count(escolaridade) %>% mutate(prop = round(100*(n/sum(n)), 1))
+```
+
+
+4. Ao analisar os números de mulheres registradas no estabelecimento UFSJ, apenas para o ano de 2010, qual raça apresenta a menor quantidade de registros? Obs: desconsiderar registros sem a raça declarada.
+
+```{r}
+quest4 <- dados_teste %>% filter(ano == 2010 & sexo == "F" & orgao == "UFSJ" & raca != "")
+quest4 %>% head()
+
+quest4 %>% count(raca) %>% arrange(n)
+```
+
+
+5. Carregar um gráfico, preferencialmente nos formatos HTML, PNG, JPEG, e PDF, contendo uma série temporal de 1985 até 2019, que trate sobre a diferença de sexo e raça. Você pode explorar as variáveis que achar mais relevantes.
+
+```{r fig.align='center', fig.width=9}
+dados_teste %>% summarise(n = length(ano))
+dados_teste %>% summarise(x1= min(ano), xn = max(ano))
+
+quest5 <- dados_teste %>% filter(sexo != "" & raca != "") %>% group_by(ano, sexo, raca) %>% summarise(remuneracao_media = mean(remuneracao), remuneracao_mediana = median(remuneracao),.groups = "drop") %>% mutate(sexo = if_else(sexo == "M", "Masculino", "Feminino"))
+quest5 %>% head()
+
+p <- quest5 %>% ggplot(aes(x = ano, y = remuneracao_media, color = raca)) + geom_line() + ylab("Remuneração Média") +  labs(color='Raça/Cor') +
+scale_y_continuous(limits = c(min(quest5$remuneracao_media), max(quest5$remuneracao_media))) +
+theme(axis.text.y = element_text(angle = 90, hjust=1, size = 5), 
+axis.text.x = element_text(angle = 45, hjust=1, size = 5), panel.spacing = unit(3, "lines"),
+axis.title.y = element_text(size=5),
+axis.title.x = element_text(size=5)) +
+facet_wrap(vars(sexo), scales = "free_y", ncol = 2) 
+
+ggplotly(p)
+
+
+```
+
+
+
+6. Faça um pequeno texto explicativo sobre o gráfico gerado na questão anterior, apresentado os principais pontos de interesse e elaborando as estatísticas mais relevantes. Obs: no máximo 3 (três) parágrafos.
+
+```{r fig.align='center'}
+
+#Valores considerando as rendas medias
+quest5 %>% ungroup() %>% group_by(raca, sexo) %>% summarise(media = mean(remuneracao_media), dp = sd(remuneracao_media), mediana = median(remuneracao_media), Q1 = quantile(remuneracao_media, probs = 0.25), Q3 = quantile(remuneracao_media, probs = 0.75),.groups = "drop")
+```
+
+```{r echo=FALSE}
+# #Valores considerando as rendas dos trabalhadores.
+# dados_teste %>% mutate(sexo = if_else(sexo == "M", "Masculino", "Feminino")) %>% filter(raca != "" & sexo != "") %>% group_by(raca, sexo) %>% summarise(media = mean(remuneracao), dp = sd(remuneracao), mediana = median(remuneracao), Q1 = quantile(remuneracao, probs = 0.25), Q3 = quantile(remuneracao, probs = 0.75),.groups = "drop")
+# 
+# #Distribuicao das rendas dos trabalhadores dentro de cada sexo e raca
+# dados_teste %>% mutate(sexo = if_else(sexo == "M", "Masculino", "Feminino")) %>% filter(raca != "" & sexo != "") %>% ggplot(aes(x = raca, y=remuneracao)) + geom_boxplot() + facet_wrap(vars(sexo), scales = "free_y", ncol = 2)
+```
+
+
+
+
+
+
+
+
+
+
+*No gráfico acima são apresentadas as séries de 1990 a 2019 da renda média considerando os diferentes níveis de raça e sexo. O objetivo deste gráfico é tentar analisar a evolução da renda média ao longo dos anos, verificando a influência das variáveis raça e sexo. Além disso, tentar responder perguntas como: i) a raça é relevante para o nível da renda dos trabalhadores? ii) qual o impacto do sexo na renda dos trabalhadores? iii) qual será o impacto conjunto de raça e sexo na renda média dos trabalhadores?*
+
+*A renda média para homens indígenas tem uma tendência de crescimento nos últimos 10 anos, enquanto que para as mulheres indígenas apresenta uma tendência de queda. Além disso, a renda média para os indígenas apresenta uma maior variação (para as mulheres o desvio-padrão é $S = 26,3$ reais e para os homens é de $S = 30,0$ reais) do que as observadas para a maioria das outras raças. Entretanto, a renda das mulheres amarelas apresenta uma maior variação geral (o desvio-padrão é $S = 33$ reais). Por fim, a partir das medidas calculadas é possível notar que as rendas médias são bem similares independente da raça e do sexo (possível ver observando as médias e os quartis).* 
